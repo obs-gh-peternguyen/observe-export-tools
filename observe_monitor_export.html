@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Observe Monitor Export Tool</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background: #0d1117; color: #c9d1d9; min-height: 100vh; }
+  .header { background: #161b22; border-bottom: 1px solid #30363d; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  .header h1 { font-size: 18px; font-weight: 600; color: #f0f6fc; }
+  .header span { font-size: 12px; color: #8b949e; background: #30363d; padding: 2px 8px; border-radius: 12px; }
+  .form-bar { background: #161b22; border-bottom: 1px solid #30363d; padding: 12px 24px; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-family: monospace; outline: none; }
+  .form-group input:focus { border-color: #58a6ff; }
+  .form-group input::placeholder { color: #484f58; }
+  #customerId { width: 140px; }
+  #domain { width: 120px; }
+  #monitorId { width: 120px; }
+  #token { width: 280px; }
+  .btn { padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
+  .btn-primary { background: #238636; color: #fff; border-color: #2ea043; }
+  .btn-primary:hover { background: #2ea043; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: #21262d; color: #c9d1d9; border-color: #30363d; }
+  .btn-secondary:hover { background: #30363d; }
+  .main { display: grid; grid-template-columns: 1fr 1fr; height: calc(100vh - 110px); }
+  .panel { display: flex; flex-direction: column; overflow: hidden; }
+  .panel:first-child { border-right: 1px solid #30363d; }
+  .panel-header { background: #161b22; border-bottom: 1px solid #30363d; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .panel-header h2 { font-size: 13px; font-weight: 600; color: #f0f6fc; }
+  .panel-body { flex: 1; overflow: auto; padding: 16px; }
+  .status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+  .status-idle { background: #30363d; color: #8b949e; }
+  .status-loading { background: #1f2937; color: #58a6ff; }
+  .status-success { background: #0d2818; color: #3fb950; }
+  .status-error { background: #2d1115; color: #f85149; }
+  pre { font-size: 12px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; color: #c9d1d9; }
+  .json-key { color: #7ee787; }
+  .json-string { color: #a5d6ff; }
+  .json-number { color: #d2a8ff; }
+  .json-bool { color: #ff7b72; }
+  .json-null { color: #ff7b72; }
+  .placeholder { color: #484f58; font-size: 13px; display: flex; align-items: center; justify-content: center; height: 100%; text-align: center; line-height: 1.8; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #30363d; border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .copy-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #238636; color: #fff; padding: 8px 20px; border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 100; }
+  .copy-toast.show { opacity: 1; }
+  .error-detail { color: #f85149; background: #2d1115; border: 1px solid #f8514930; border-radius: 6px; padding: 12px; font-size: 12px; margin-top: 8px; }
+  .monitor-name { color: #58a6ff; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .monitor-meta { font-size: 11px; color: #8b949e; margin-bottom: 12px; display: flex; gap: 12px; }
+  .monitor-meta span { background: #21262d; padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Observe Monitor Export</h1>
+  <span>v1 API</span>
+</div>
+
+<div class="form-bar">
+  <div class="form-group">
+    <label>Customer ID</label>
+    <input type="text" id="customerId" placeholder="123456789">
+  </div>
+  <div class="form-group">
+    <label>Domain (optional)</label>
+    <input type="text" id="domain" placeholder="abc">
+  </div>
+  <div class="form-group">
+    <label>Monitor ID</label>
+    <input type="text" id="monitorId" placeholder="12345678">
+  </div>
+  <div class="form-group">
+    <label>Bearer Token</label>
+    <input type="password" id="token" placeholder="paste token here">
+  </div>
+  <button class="btn btn-primary" id="fetchBtn" onclick="fetchMonitor()">Fetch Monitor</button>
+</div>
+
+<div class="main">
+  <div class="panel">
+    <div class="panel-header">
+      <h2>GET /v1/monitors/{id}</h2>
+      <span class="status status-idle" id="getStatus">idle</span>
+    </div>
+    <div class="panel-body" id="getOutput">
+      <div class="placeholder">Enter credentials above and click Fetch Monitor<br>to retrieve the monitor definition.</div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-header">
+      <h2>POST /v1/monitors (create command)</h2>
+      <button class="btn btn-secondary" id="copyBtn" onclick="copyCurl()" style="display:none;">Copy</button>
+    </div>
+    <div class="panel-body" id="postOutput">
+      <div class="placeholder">The curl command to recreate the monitor<br>will appear here after fetching.</div>
+    </div>
+  </div>
+</div>
+
+<div class="copy-toast" id="toast">Copied to clipboard</div>
+
+<script>
+function setStatus(id, state, text) {
+  const el = document.getElementById(id);
+  el.className = 'status status-' + state;
+  el.innerHTML = (state === 'loading' ? '<span class="spinner"></span>' : '') + text;
+}
+
+async function fetchMonitor() {
+  const customerId = document.getElementById('customerId').value.trim();
+  const domain = document.getElementById('domain').value.trim();
+  const monitorId = document.getElementById('monitorId').value.trim();
+  const token = document.getElementById('token').value.trim();
+
+  if (!customerId || !monitorId || !token) {
+    alert('Please fill in Customer ID, Monitor ID, and Token.');
+    return;
+  }
+
+  const fetchBtn = document.getElementById('fetchBtn');
+  fetchBtn.disabled = true;
+  setStatus('getStatus', 'loading', 'fetching...');
+  document.getElementById('getOutput').innerHTML = '';
+  document.getElementById('postOutput').innerHTML = '<div class="placeholder">Waiting for GET response...</div>';
+  document.getElementById('copyBtn').style.display = 'none';
+
+  const host = domain ? customerId + '.' + domain + '.observeinc.com' : customerId + '.observeinc.com';
+  const url = 'https://' + host + '/v1/monitors/' + monitorId;
+
+  try {
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + customerId + ' ' + token,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      setStatus('getStatus', 'error', 'HTTP ' + resp.status);
+      document.getElementById('getOutput').innerHTML =
+        '<div class="error-detail">' + JSON.stringify(data, null, 2) + '</div>';
+      fetchBtn.disabled = false;
+      return;
+    }
+
+    setStatus('getStatus', 'success', 'HTTP 200');
+
+    const name = data.name || 'Unknown';
+    const ruleKind = data.ruleKind || '';
+    const mid = data.id || monitorId;
+
+    document.getElementById('getOutput').innerHTML =
+      '<div class="monitor-name">' + escapeHtml(name) + '</div>' +
+      '<div class="monitor-meta">' +
+        '<span>ID: ' + escapeHtml(mid) + '</span>' +
+        '<span>Kind: ' + escapeHtml(ruleKind) + '</span>' +
+        (data.disabled ? '<span style="color:#f85149;">Disabled</span>' : '<span style="color:#3fb950;">Enabled</span>') +
+      '</div>' +
+      '<pre>' + syntaxHighlight(JSON.stringify(data, null, 2)) + '</pre>';
+
+    const curlDisplay = buildCreateCurl(data, customerId, domain, '<token>');
+    const curlCopy = buildCreateCurl(data, customerId, domain, token);
+    document.getElementById('postOutput').innerHTML = '<pre id="curlText">' + highlightCurl(curlDisplay) + '</pre>';
+    document.getElementById('postOutput').dataset.curlCopy = curlCopy;
+    document.getElementById('copyBtn').style.display = 'inline-block';
+
+  } catch (err) {
+    setStatus('getStatus', 'error', 'failed');
+    document.getElementById('getOutput').innerHTML =
+      '<div class="error-detail">Network error: ' + escapeHtml(err.message) +
+      '<br><br>If this is a CORS error, you may need to run this page from the same origin or use a proxy.</div>';
+  }
+
+  fetchBtn.disabled = false;
+}
+
+function buildCreateCurl(data, customerId, domain, tokenValue) {
+  const createBody = transformForCreate(data);
+  const jsonStr = JSON.stringify(createBody, null, 2);
+  const host = domain ? customerId + '.' + domain + '.observeinc.com' : customerId + '.observeinc.com';
+
+  return "curl https://" + host + "/v1/monitors \\\n" +
+    "  --request POST \\\n" +
+    "  --header 'Content-Type: application/json' \\\n" +
+    "  --header 'Authorization: Bearer " + customerId + " " + tokenValue + "' \\\n" +
+    "  --data '" + jsonStr.replace(/'/g, "'\\''") + "'";
+}
+
+function transformForCreate(data) {
+  const body = stripNulls(JSON.parse(JSON.stringify(data)));
+
+  delete body.id;
+  delete body.disabled;
+  delete body.monitorVersion;
+
+  body.name = (body.name || '') + ' (auto-generated)';
+
+  if (body.definition) {
+    cleanDefinition(body.definition);
+  }
+
+  if (body.actionRules && Array.isArray(body.actionRules)) {
+    body.actionRules = body.actionRules.map(function(rule) {
+      return transformActionRule(rule);
+    });
+  }
+
+  const ordered = {};
+  if (body.name !== undefined) ordered.name = body.name;
+  if (body.description !== undefined) ordered.description = body.description;
+  if (body.ruleKind !== undefined) ordered.ruleKind = body.ruleKind;
+  if (body.definition !== undefined) ordered.definition = body.definition;
+  if (body.actionRules !== undefined) ordered.actionRules = body.actionRules;
+  for (const k of Object.keys(body)) {
+    if (!(k in ordered)) ordered[k] = body[k];
+  }
+  return ordered;
+}
+
+function cleanDefinition(def) {
+  if (def.inputQuery) {
+    delete def.inputQuery.layout;
+
+    if (def.inputQuery.stages) {
+      def.inputQuery.stages.forEach(function(stage) {
+        delete stage.layout;
+
+        if (Array.isArray(stage.input)) {
+          stage.input = stage.input[0];
+        }
+        if (stage.input) {
+          delete stage.input.datasetPath;
+          delete stage.input.stageId;
+        }
+      });
+    }
+  }
+}
+
+function transformActionRule(rule) {
+  const out = {};
+
+  if (rule.definition) {
+    out.definition = stripNulls(JSON.parse(JSON.stringify(rule.definition)));
+    delete out.definition.actionId;
+    if (!out.definition.name && out.definition.type) {
+      if (out.definition.type === 'Email' && out.definition.email) {
+        const addrs = out.definition.email.addresses || [];
+        out.definition.name = 'Email ' + (addrs[0] || 'action');
+      } else if (out.definition.type === 'Webhook') {
+        out.definition.name = 'Webhook action';
+      } else {
+        out.definition.name = out.definition.type + ' action';
+      }
+    }
+  } else if (rule.actionId) {
+    out.actionId = rule.actionId;
+  }
+
+  if (rule.levels != null) out.levels = rule.levels;
+  if (rule.conditions != null) out.conditions = rule.conditions;
+  if (rule.sendEndNotifications != null) out.sendEndNotifications = rule.sendEndNotifications;
+  if (rule.sendRemindersInterval != null) out.sendRemindersInterval = rule.sendRemindersInterval;
+
+  return out;
+}
+
+function copyCurl() {
+  const panel = document.getElementById('postOutput');
+  const curlCopy = panel.dataset.curlCopy;
+  if (!curlCopy) return;
+  navigator.clipboard.writeText(curlCopy).then(function() {
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(function() { toast.classList.remove('show'); }, 1500);
+  });
+}
+
+function stripNulls(obj) {
+  if (Array.isArray(obj)) return obj.map(stripNulls);
+  if (obj && typeof obj === 'object') {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v !== null) out[k] = stripNulls(v);
+    }
+    return out;
+  }
+  return obj;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
+function syntaxHighlight(json) {
+  return json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*")(\s*:)?/g, function(match, str, _, colon) {
+      if (colon) return '<span class="json-key">' + match + '</span>';
+      return '<span class="json-string">' + match + '</span>';
+    })
+    .replace(/\b(true|false)\b/g, '<span class="json-bool">$1</span>')
+    .replace(/\bnull\b/g, '<span class="json-null">null</span>')
+    .replace(/\b(-?\d+\.?\d*([eE][+-]?\d+)?)\b/g, '<span class="json-number">$1</span>');
+}
+
+function highlightCurl(cmd) {
+  const parts = cmd.split("--data '");
+  if (parts.length < 2) return escapeHtml(cmd);
+  const prefix = escapeHtml(parts[0] + "--data '");
+  const rest = parts.slice(1).join("--data '");
+  const jsonPart = rest.slice(0, rest.lastIndexOf("'"));
+  const suffix = escapeHtml(rest.slice(rest.lastIndexOf("'")));
+  return prefix + syntaxHighlight(jsonPart) + suffix;
+}
+</script>
+
+</body>
+</html>
