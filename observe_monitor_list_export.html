@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Observe Monitor List Export</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background: #0d1117; color: #c9d1d9; min-height: 100vh; display: flex; flex-direction: column; }
+  .header { background: #161b22; border-bottom: 1px solid #30363d; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  .header h1 { font-size: 18px; font-weight: 600; color: #f0f6fc; }
+  .header span { font-size: 12px; color: #8b949e; background: #30363d; padding: 2px 8px; border-radius: 12px; }
+  .form-bar { background: #161b22; border-bottom: 1px solid #30363d; padding: 12px 24px; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-family: monospace; outline: none; }
+  .form-group input:focus { border-color: #58a6ff; }
+  .form-group input::placeholder { color: #484f58; }
+  #customerId { width: 140px; }
+  #domain { width: 120px; }
+  #token { width: 280px; }
+  .btn { padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
+  .btn-primary { background: #238636; color: #fff; border-color: #2ea043; }
+  .btn-primary:hover { background: #2ea043; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: #21262d; color: #c9d1d9; border-color: #30363d; }
+  .btn-secondary:hover { background: #30363d; }
+  .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .toolbar { background: #161b22; border-bottom: 1px solid #30363d; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .toolbar-left { display: flex; align-items: center; gap: 12px; }
+  .toolbar h2 { font-size: 13px; font-weight: 600; color: #f0f6fc; }
+  .status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+  .status-idle { background: #30363d; color: #8b949e; }
+  .status-loading { background: #1f2937; color: #58a6ff; }
+  .status-success { background: #0d2818; color: #3fb950; }
+  .status-error { background: #2d1115; color: #f85149; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #30363d; border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .table-wrap { flex: 1; overflow: auto; padding: 16px; }
+  .placeholder { color: #484f58; font-size: 13px; display: flex; align-items: center; justify-content: center; height: 200px; text-align: center; line-height: 1.8; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: #161b22; color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 12px; text-align: left; border-bottom: 1px solid #30363d; position: sticky; top: 0; white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid #21262d; transition: background 0.1s; }
+  tbody tr:hover { background: #161b22; }
+  tbody td { padding: 8px 12px; vertical-align: middle; }
+  .badge { font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 500; }
+  .badge-enabled { background: #0d2818; color: #3fb950; }
+  .badge-disabled { background: #2d1115; color: #f85149; }
+  .badge-type-1 { background: #1a2332; color: #79c0ff; }
+  .badge-type-2 { background: #271a32; color: #d2a8ff; }
+  .badge-type-3 { background: #2b1028; color: #f778ba; }
+  .badge-type-4 { background: #0d2626; color: #2dd4bf; }
+  .badge-type-5 { background: #272200; color: #e3c55a; }
+  .badge-type-6 { background: #1a1a32; color: #818cf8; }
+  .badge-type-7 { background: #0d2030; color: #67d4f8; }
+  .badge-tz { background: #2b1e0a; color: #e3a44a; }
+  thead th { cursor: pointer; user-select: none; }
+  thead th:hover { color: #c9d1d9; }
+  thead th .sort-icon { margin-left: 4px; opacity: 0.4; font-style: normal; }
+  thead th.sort-asc .sort-icon, thead th.sort-desc .sort-icon { opacity: 1; color: #58a6ff; }
+  .monitor-name { color: #f0f6fc; font-weight: 500; }
+  .monitor-id { color: #8b949e; font-size: 11px; font-family: monospace; }
+  .monitor-desc { color: #8b949e; font-size: 12px; }
+  .error-detail { color: #f85149; background: #2d1115; border: 1px solid #f8514930; border-radius: 6px; padding: 12px; font-size: 12px; margin: 16px; }
+  .row-count { font-size: 11px; color: #8b949e; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Observe Monitor List Export</h1>
+  <span>v1 API</span>
+</div>
+
+<div class="form-bar">
+  <div class="form-group">
+    <label>Customer ID</label>
+    <input type="text" id="customerId" placeholder="123456789">
+  </div>
+  <div class="form-group">
+    <label>Domain (optional)</label>
+    <input type="text" id="domain" placeholder="abc">
+  </div>
+  <div class="form-group">
+    <label>Bearer Token</label>
+    <input type="password" id="token" placeholder="paste token here">
+  </div>
+  <button class="btn btn-primary" id="fetchBtn" onclick="fetchMonitors()">List Monitors</button>
+</div>
+
+<div class="content">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <h2>GET /v1/monitors</h2>
+      <span class="status status-idle" id="getStatus">idle</span>
+      <span class="row-count" id="rowCount"></span>
+    </div>
+    <button class="btn btn-secondary" id="downloadBtn" onclick="downloadCSV()" style="display:none;">Download CSV</button>
+  </div>
+  <div class="table-wrap" id="tableWrap">
+    <div class="placeholder">Enter credentials above and click List Monitors<br>to retrieve all monitors.</div>
+  </div>
+</div>
+
+<script>
+let monitorsData = [];
+let sortCol = null;
+let sortDir = 1;
+
+const TYPE_COLORS = [
+  'badge-type-1',
+  'badge-type-2',
+  'badge-type-3',
+  'badge-type-4',
+  'badge-type-5',
+  'badge-type-6',
+  'badge-type-7'
+];
+const typeColorMap = {};
+let typeColorIndex = 0;
+
+function getTypeBadgeClass(kind) {
+  if (!kind) return 'badge-type-1';
+  if (!typeColorMap[kind]) {
+    typeColorMap[kind] = TYPE_COLORS[typeColorIndex % TYPE_COLORS.length];
+    typeColorIndex++;
+  }
+  return typeColorMap[kind];
+}
+
+function setStatus(state, text) {
+  const el = document.getElementById('getStatus');
+  el.className = 'status status-' + state;
+  el.innerHTML = (state === 'loading' ? '<span class="spinner"></span>' : '') + text;
+}
+
+async function fetchMonitors() {
+  const customerId = document.getElementById('customerId').value.trim();
+  const domain = document.getElementById('domain').value.trim();
+  const token = document.getElementById('token').value.trim();
+
+  if (!customerId || !token) {
+    alert('Please fill in Customer ID and Token.');
+    return;
+  }
+
+  const fetchBtn = document.getElementById('fetchBtn');
+  fetchBtn.disabled = true;
+  setStatus('loading', 'fetching...');
+  document.getElementById('rowCount').textContent = '';
+  document.getElementById('downloadBtn').style.display = 'none';
+  document.getElementById('tableWrap').innerHTML = '';
+  monitorsData = [];
+
+  const host = domain ? customerId + '.' + domain + '.observeinc.com' : customerId + '.observeinc.com';
+  const url = 'https://' + host + '/v1/monitors';
+
+  try {
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + customerId + ' ' + token,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      setStatus('error', 'HTTP ' + resp.status);
+      document.getElementById('tableWrap').innerHTML =
+        '<div class="error-detail">' + escapeHtml(JSON.stringify(data, null, 2)) + '</div>';
+      fetchBtn.disabled = false;
+      return;
+    }
+
+    monitorsData = Array.isArray(data) ? data : [];
+    setStatus('success', 'HTTP 200');
+    document.getElementById('rowCount').textContent = monitorsData.length + ' monitor' + (monitorsData.length !== 1 ? 's' : '');
+
+    if (monitorsData.length === 0) {
+      document.getElementById('tableWrap').innerHTML = '<div class="placeholder">No monitors found.</div>';
+    } else {
+      renderTable(monitorsData);
+      document.getElementById('downloadBtn').style.display = 'inline-block';
+    }
+
+  } catch (err) {
+    setStatus('error', 'failed');
+    document.getElementById('tableWrap').innerHTML =
+      '<div class="error-detail">Network error: ' + escapeHtml(err.message) +
+      '<br><br>If this is a CORS error, you may need to run this page from the same origin or use a proxy.</div>';
+  }
+
+  fetchBtn.disabled = false;
+}
+
+function ruleKindBadge(kind) {
+  return '<span class="badge ' + getTypeBadgeClass(kind) + '">' + escapeHtml(kind || '') + '</span>';
+}
+
+const COLUMNS = [
+  { key: 'name',           label: 'Name' },
+  { key: 'id',             label: 'Monitor ID' },
+  { key: 'description',    label: 'Description' },
+  { key: 'ruleKind',       label: 'Monitor Type' },
+  { key: 'disabled',       label: 'Status' },
+  { key: 'monitorVersion', label: 'Last Modified' }
+];
+
+function sortBy(key) {
+  if (sortCol === key) {
+    sortDir *= -1;
+  } else {
+    sortCol = key;
+    sortDir = 1;
+  }
+  renderTable(monitorsData);
+}
+
+function getSortValue(m, key) {
+  if (key === 'monitorVersion') return m.monitorVersion ? Number(BigInt(String(m.monitorVersion)) / 1000000n) : 0;
+  if (key === 'disabled') return m.disabled ? 1 : 0;
+  return String(m[key] || '').toLowerCase();
+}
+
+function renderTable(monitors) {
+  let sorted = monitors.slice();
+  if (sortCol) {
+    sorted.sort(function(a, b) {
+      const av = getSortValue(a, sortCol);
+      const bv = getSortValue(b, sortCol);
+      if (av < bv) return -1 * sortDir;
+      if (av > bv) return 1 * sortDir;
+      return 0;
+    });
+  }
+
+  let html = '<table><thead><tr>';
+  COLUMNS.forEach(function(col) {
+    let cls = '';
+    let icon = '⇅';
+    if (sortCol === col.key) {
+      cls = sortDir === 1 ? ' sort-asc' : ' sort-desc';
+      icon = sortDir === 1 ? '▲' : '▼';
+    }
+    html += '<th class="' + cls + '" onclick="sortBy(\'' + col.key + '\')">' +
+      col.label + '<i class="sort-icon">' + icon + '</i></th>';
+  });
+  html += '</tr></thead><tbody>';
+
+  sorted.forEach(function(m) {
+    const ts = nanoToFormatted(m.monitorVersion);
+    html += '<tr>' +
+      '<td><span class="monitor-name">' + escapeHtml(m.name || '') + '</span></td>' +
+      '<td><span class="monitor-id">' + escapeHtml(m.id || '') + '</span></td>' +
+      '<td><span class="monitor-desc">' + escapeHtml(m.description || '') + '</span></td>' +
+      '<td>' + ruleKindBadge(m.ruleKind) + '</td>' +
+      '<td><span class="badge ' + (m.disabled ? 'badge-disabled' : 'badge-enabled') + '">' +
+        (m.disabled ? 'Disabled' : 'Enabled') + '</span></td>' +
+      '<td><span class="monitor-desc">' + escapeHtml(ts.display) + ' <span class="badge badge-tz">' + escapeHtml(ts.tz) + '</span></span></td>' +
+      '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('tableWrap').innerHTML = html;
+}
+
+function downloadCSV() {
+  if (!monitorsData.length) return;
+
+  const headers = ['Monitor ID', 'Name', 'Description', 'Monitor Type', 'Disabled', 'Last Modified'];
+
+  const rows = [headers.join(',')];
+  monitorsData.forEach(function(m) {
+    const vals = [m.id, m.name, m.description, m.ruleKind, m.disabled, nanoToFormatted(m.monitorVersion).full];
+    rows.push(vals.map(function(v) {
+      return '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
+    }).join(','));
+  });
+
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'observe_monitors_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function nanoToFormatted(ns) {
+  if (!ns) return { display: '', tz: '', full: '' };
+  const ms = Math.floor(Number(BigInt(String(ns)) / 1000000n));
+  const d = new Date(ms);
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const year = d.getFullYear();
+  const month = months[d.getMonth()];
+  const day = String(d.getDate()).padStart(2, '0');
+  let h = d.getHours();
+  const tt = h >= 12 ? 'pm' : 'am';
+  h = h % 12 || 12;
+  const hh = String(h).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  const tz = d.toLocaleTimeString('en', { timeZoneName: 'short' }).split(' ').pop();
+  const display = year + '-' + month + '-' + day + ' ' + hh + ':' + mm + ':' + ss + ' ' + tt;
+  return { display, tz, full: display + ' ' + tz };
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+</script>
+
+</body>
+</html>
