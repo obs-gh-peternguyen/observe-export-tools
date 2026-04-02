@@ -380,7 +380,6 @@ function csvCell(val) {
 function transformForCreate(data) {
   const body = stripNulls(JSON.parse(JSON.stringify(data)));
   delete body.id;
-  delete body.disabled;
   delete body.monitorVersion;
   body.name = (body.name || '') + ' (auto-generated)';
   if (body.definition) cleanDefinition(body.definition);
@@ -388,7 +387,7 @@ function transformForCreate(data) {
     body.actionRules = body.actionRules.map(transformActionRule);
   }
   const ordered = {};
-  ['name', 'description', 'ruleKind', 'definition', 'actionRules'].forEach(function(k) {
+  ['name', 'description', 'ruleKind', 'disabled', 'definition', 'actionRules'].forEach(function(k) {
     if (body[k] !== undefined) ordered[k] = body[k];
   });
   Object.keys(body).forEach(function(k) { if (!(k in ordered)) ordered[k] = body[k]; });
