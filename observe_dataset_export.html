@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Observe Dataset Export</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background: #0d1117; color: #c9d1d9; min-height: 100vh; display: flex; flex-direction: column; }
+  .header { background: #161b22; border-bottom: 1px solid #30363d; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  .header h1 { font-size: 18px; font-weight: 600; color: #f0f6fc; }
+  .header span { font-size: 12px; color: #8b949e; background: #30363d; padding: 2px 8px; border-radius: 12px; }
+  .form-bar { background: #161b22; border-bottom: 1px solid #30363d; padding: 12px 24px; display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-group input { background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 10px; border-radius: 6px; font-size: 13px; font-family: monospace; outline: none; }
+  .form-group input:focus { border-color: #58a6ff; }
+  .form-group input::placeholder { color: #484f58; }
+  #customerId { width: 140px; }
+  #domain { width: 120px; }
+  #token { width: 280px; }
+  .btn { padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
+  .btn-primary { background: #238636; color: #fff; border-color: #2ea043; }
+  .btn-primary:hover { background: #2ea043; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-secondary { background: #21262d; color: #c9d1d9; border-color: #30363d; }
+  .btn-secondary:hover { background: #30363d; }
+  .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .toolbar { background: #161b22; border-bottom: 1px solid #30363d; padding: 8px 16px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .toolbar-left { display: flex; align-items: center; gap: 12px; }
+  .toolbar h2 { font-size: 13px; font-weight: 600; color: #f0f6fc; }
+  .status { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+  .status-idle { background: #30363d; color: #8b949e; }
+  .status-loading { background: #1f2937; color: #58a6ff; }
+  .status-success { background: #0d2818; color: #3fb950; }
+  .status-error { background: #2d1115; color: #f85149; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #30363d; border-top-color: #58a6ff; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 6px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .table-wrap { flex: 1; overflow: auto; padding: 16px; }
+  .placeholder { color: #484f58; font-size: 13px; display: flex; align-items: center; justify-content: center; height: 200px; text-align: center; line-height: 1.8; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: #161b22; color: #8b949e; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 12px; text-align: left; border-bottom: 1px solid #30363d; position: sticky; top: 0; white-space: nowrap; cursor: pointer; user-select: none; }
+  thead th:hover { color: #c9d1d9; }
+  thead th .sort-icon { margin-left: 4px; opacity: 0.4; font-style: normal; }
+  thead th.sort-asc .sort-icon, thead th.sort-desc .sort-icon { opacity: 1; color: #58a6ff; }
+  tbody tr { border-bottom: 1px solid #21262d; transition: background 0.1s; }
+  tbody tr:hover { background: #161b22; }
+  tbody td { padding: 8px 12px; vertical-align: middle; }
+  .badge { font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 500; white-space: nowrap; }
+  .badge-type-1 { background: #1a2332; color: #79c0ff; }
+  .badge-type-2 { background: #271a32; color: #d2a8ff; }
+  .badge-type-3 { background: #2b1028; color: #f778ba; }
+  .badge-type-4 { background: #0d2626; color: #2dd4bf; }
+  .badge-type-5 { background: #272200; color: #e3c55a; }
+  .badge-type-6 { background: #1a1a32; color: #818cf8; }
+  .badge-type-7 { background: #0d2030; color: #67d4f8; }
+  .badge-tz { background: #2b1e0a; color: #e3a44a; }
+  .cell-primary { color: #f0f6fc; font-weight: 500; }
+  .cell-mono { color: #8b949e; font-size: 11px; font-family: monospace; }
+  .cell-muted { color: #8b949e; font-size: 12px; }
+  .cell-key { color: #79c0ff; font-size: 11px; font-family: monospace; }
+  .error-detail { color: #f85149; background: #2d1115; border: 1px solid #f8514930; border-radius: 6px; padding: 12px; font-size: 12px; margin: 16px; }
+  .row-count { font-size: 11px; color: #8b949e; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Observe Dataset Export</h1>
+  <span>v1 API</span>
+</div>
+
+<div class="form-bar">
+  <div class="form-group">
+    <label>Customer ID</label>
+    <input type="text" id="customerId" placeholder="123456789">
+  </div>
+  <div class="form-group">
+    <label>Domain (optional)</label>
+    <input type="text" id="domain" placeholder="abc">
+  </div>
+  <div class="form-group">
+    <label>Bearer Token</label>
+    <input type="password" id="token" placeholder="paste token here">
+  </div>
+  <button class="btn btn-primary" id="fetchBtn" onclick="fetchDatasets()">List Datasets</button>
+</div>
+
+<div class="content">
+  <div class="toolbar">
+    <div class="toolbar-left">
+      <h2>GET /v1/dataset</h2>
+      <span class="status status-idle" id="getStatus">idle</span>
+      <span class="row-count" id="rowCount"></span>
+    </div>
+    <button class="btn btn-secondary" id="downloadBtn" onclick="downloadCSV()" style="display:none;">Download CSV</button>
+  </div>
+  <div class="table-wrap" id="tableWrap">
+    <div class="placeholder">Enter credentials above and click List Datasets<br>to retrieve all datasets.</div>
+  </div>
+</div>
+
+<script>
+let datasetsData = [];
+let sortCol = null;
+let sortDir = 1;
+
+const TYPE_COLORS = ['badge-type-1','badge-type-2','badge-type-3','badge-type-4','badge-type-5','badge-type-6','badge-type-7'];
+const kindColorMap = {};
+let kindColorIndex = 0;
+
+function getKindBadgeClass(kind) {
+  if (!kind) return 'badge-type-1';
+  if (!kindColorMap[kind]) { kindColorMap[kind] = TYPE_COLORS[kindColorIndex++ % TYPE_COLORS.length]; }
+  return kindColorMap[kind];
+}
+
+function setStatus(state, text) {
+  const el = document.getElementById('getStatus');
+  el.className = 'status status-' + state;
+  el.innerHTML = (state === 'loading' ? '<span class="spinner"></span>' : '') + text;
+}
+
+async function fetchDatasets() {
+  const customerId = document.getElementById('customerId').value.trim();
+  const domain     = document.getElementById('domain').value.trim();
+  const token      = document.getElementById('token').value.trim();
+
+  if (!customerId || !token) { alert('Please fill in Customer ID and Token.'); return; }
+
+  const fetchBtn = document.getElementById('fetchBtn');
+  fetchBtn.disabled = true;
+  setStatus('loading', 'fetching...');
+  document.getElementById('rowCount').textContent = '';
+  document.getElementById('downloadBtn').style.display = 'none';
+  document.getElementById('tableWrap').innerHTML = '';
+  datasetsData = [];
+
+  const host = domain ? customerId + '.' + domain + '.observeinc.com' : customerId + '.observeinc.com';
+  const url = 'https://' + host + '/v1/dataset';
+
+  try {
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + customerId + ' ' + token,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const json = await resp.json();
+
+    if (!resp.ok) {
+      setStatus('error', 'HTTP ' + resp.status);
+      document.getElementById('tableWrap').innerHTML =
+        '<div class="error-detail">' + escapeHtml(JSON.stringify(json, null, 2)) + '</div>';
+      fetchBtn.disabled = false;
+      return;
+    }
+
+    datasetsData = (json && Array.isArray(json.data)) ? json.data : [];
+    setStatus('success', 'HTTP 200');
+    document.getElementById('rowCount').textContent = datasetsData.length + ' dataset' + (datasetsData.length !== 1 ? 's' : '');
+
+    if (datasetsData.length === 0) {
+      document.getElementById('tableWrap').innerHTML = '<div class="placeholder">No datasets found.</div>';
+    } else {
+      renderTable(datasetsData);
+      document.getElementById('downloadBtn').style.display = 'inline-block';
+    }
+
+  } catch (err) {
+    setStatus('error', 'failed');
+    document.getElementById('tableWrap').innerHTML =
+      '<div class="error-detail">Network error: ' + escapeHtml(err.message) +
+      '<br><br>If this is a CORS error, you may need to run this page from the same origin or use a proxy.</div>';
+  }
+
+  fetchBtn.disabled = false;
+}
+
+const COLUMNS = [
+  { key: 'meta.id',           label: 'ID' },
+  { key: 'meta.workspaceId',  label: 'Workspace ID' },
+  { key: 'meta.customerId',   label: 'Customer ID' },
+  { key: 'config.name',       label: 'Name' },
+  { key: 'config.labelField', label: 'Label Field' },
+  { key: 'config.primaryKey', label: 'Primary Key' },
+  { key: 'state.urlPath',     label: 'URL Path' },
+  { key: 'state.kind',        label: 'Kind' },
+  { key: 'state.createdBy',   label: 'Created By' },
+  { key: 'state.createdDate', label: 'Created Date', isDate: true },
+  { key: 'state.updatedBy',   label: 'Updated By' },
+  { key: 'state.updatedDate', label: 'Updated Date', isDate: true }
+];
+
+function getVal(item, key) {
+  return key.split('.').reduce(function(o, k) { return (o && o[k] !== undefined) ? o[k] : null; }, item);
+}
+
+function sortBy(key) {
+  sortDir = sortCol === key ? sortDir * -1 : 1;
+  sortCol = key;
+  renderTable(datasetsData);
+}
+
+function getSortValue(item, key) {
+  const col = COLUMNS.find(function(c) { return c.key === key; });
+  const v = getVal(item, key);
+  if (col && col.isDate) return v ? new Date(v).getTime() : 0;
+  if (Array.isArray(v)) return v.join(',').toLowerCase();
+  return String(v || '').toLowerCase();
+}
+
+function renderTable(items) {
+  let sorted = items.slice();
+  if (sortCol) {
+    sorted.sort(function(a, b) {
+      const av = getSortValue(a, sortCol), bv = getSortValue(b, sortCol);
+      return av < bv ? -sortDir : av > bv ? sortDir : 0;
+    });
+  }
+
+  let html = '<table><thead><tr>';
+  COLUMNS.forEach(function(col) {
+    const active = sortCol === col.key;
+    const cls = active ? (sortDir === 1 ? ' sort-asc' : ' sort-desc') : '';
+    const icon = active ? (sortDir === 1 ? '▲' : '▼') : '⇅';
+    html += '<th class="' + cls + '" onclick="sortBy(\'' + col.key + '\')">' +
+      col.label + '<i class="sort-icon">' + icon + '</i></th>';
+  });
+  html += '</tr></thead><tbody>';
+
+  sorted.forEach(function(item) {
+    const metaId       = getVal(item, 'meta.id') || '';
+    const wsId         = getVal(item, 'meta.workspaceId') || '';
+    const custId       = getVal(item, 'meta.customerId') || '';
+    const cfgName      = getVal(item, 'config.name') || '';
+    const labelField   = getVal(item, 'config.labelField') || '';
+    const primaryKey   = getVal(item, 'config.primaryKey');
+    const urlPath      = getVal(item, 'state.urlPath') || '';
+    const kind         = getVal(item, 'state.kind') || '';
+    const createdBy    = getVal(item, 'state.createdBy') || '';
+    const createdDate  = getVal(item, 'state.createdDate');
+    const updatedBy    = getVal(item, 'state.updatedBy') || '';
+    const updatedDate  = getVal(item, 'state.updatedDate');
+
+    const pkDisplay = Array.isArray(primaryKey) ? primaryKey.join(', ') : (primaryKey || '');
+    const created = isoToFormatted(createdDate);
+    const updated = isoToFormatted(updatedDate);
+
+    html += '<tr>' +
+      '<td><span class="cell-mono">' + escapeHtml(metaId) + '</span></td>' +
+      '<td><span class="cell-mono">' + escapeHtml(wsId) + '</span></td>' +
+      '<td><span class="cell-mono">' + escapeHtml(custId) + '</span></td>' +
+      '<td><span class="cell-primary">' + escapeHtml(cfgName) + '</span></td>' +
+      '<td><span class="cell-key">' + escapeHtml(labelField) + '</span></td>' +
+      '<td><span class="cell-key">' + escapeHtml(pkDisplay) + '</span></td>' +
+      '<td><span class="cell-muted">' + escapeHtml(urlPath) + '</span></td>' +
+      '<td><span class="badge ' + getKindBadgeClass(kind) + '">' + escapeHtml(kind) + '</span></td>' +
+      '<td><span class="cell-muted">' + escapeHtml(createdBy) + '</span></td>' +
+      '<td><span class="cell-muted">' + escapeHtml(created.display) + (created.tz ? ' <span class="badge badge-tz">' + escapeHtml(created.tz) + '</span>' : '') + '</span></td>' +
+      '<td><span class="cell-muted">' + escapeHtml(updatedBy) + '</span></td>' +
+      '<td><span class="cell-muted">' + escapeHtml(updated.display) + (updated.tz ? ' <span class="badge badge-tz">' + escapeHtml(updated.tz) + '</span>' : '') + '</span></td>' +
+      '</tr>';
+  });
+
+  html += '</tbody></table>';
+  document.getElementById('tableWrap').innerHTML = html;
+}
+
+function downloadCSV() {
+  if (!datasetsData.length) return;
+
+  const headers = ['ID','Workspace ID','Customer ID','Name','Label Field','Primary Key','URL Path','Kind','Created By','Created Date','Updated By','Updated Date'];
+  const rows = [headers.map(csvCell).join(',')];
+
+  datasetsData.forEach(function(item) {
+    const primaryKey = getVal(item, 'config.primaryKey');
+    const pkStr = Array.isArray(primaryKey) ? primaryKey.join(', ') : (primaryKey || '');
+    const vals = [
+      getVal(item, 'meta.id') || '',
+      getVal(item, 'meta.workspaceId') || '',
+      getVal(item, 'meta.customerId') || '',
+      getVal(item, 'config.name') || '',
+      getVal(item, 'config.labelField') || '',
+      pkStr,
+      getVal(item, 'state.urlPath') || '',
+      getVal(item, 'state.kind') || '',
+      getVal(item, 'state.createdBy') || '',
+      isoToFormatted(getVal(item, 'state.createdDate')).full,
+      getVal(item, 'state.updatedBy') || '',
+      isoToFormatted(getVal(item, 'state.updatedDate')).full
+    ];
+    rows.push(vals.map(csvCell).join(','));
+  });
+
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'observe_datasets_' + new Date().toISOString().slice(0, 10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function csvCell(val) {
+  return '"' + String(val === undefined || val === null ? '' : val).replace(/"/g, '""') + '"';
+}
+
+function isoToFormatted(iso) {
+  if (!iso) return { display: '', tz: '', full: '' };
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return { display: String(iso), tz: '', full: String(iso) };
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const year = d.getFullYear();
+  const month = months[d.getMonth()];
+  const day = String(d.getDate()).padStart(2, '0');
+  let h = d.getHours();
+  const tt = h >= 12 ? 'pm' : 'am';
+  h = h % 12 || 12;
+  const hh = String(h).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  const tz = d.toLocaleTimeString('en', { timeZoneName: 'short' }).split(' ').pop();
+  const display = year + '-' + month + '-' + day + ' ' + hh + ':' + mm + ':' + ss + ' ' + tt;
+  return { display, tz, full: display + ' ' + tz };
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+</script>
+
+</body>
+</html>
