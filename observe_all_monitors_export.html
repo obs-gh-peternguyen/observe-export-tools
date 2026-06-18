@@ -61,7 +61,9 @@
   .badge-type-5   { background: #272200; color: #e3c55a; }
   .badge-type-6   { background: #1a1a32; color: #818cf8; }
   .badge-type-7   { background: #0d2030; color: #67d4f8; }
-  .badge-tz       { background: #2b1e0a; color: #e3a44a; }
+  .badge-tz        { background: #2b1e0a; color: #e3a44a; }
+  .badge-transform { background: #0d2626; color: #2dd4bf; }
+  .badge-scheduled { background: #2b1d11; color: #ffa657; }
   .badge-ok       { background: #0d2818; color: #3fb950; }
   .badge-err      { background: #2d1115; color: #f85149; }
   .monitor-name { color: #f0f6fc; font-weight: 500; }
@@ -134,6 +136,7 @@ const COLUMNS = [
   { key: 'id',             label: 'Monitor ID' },
   { key: 'description',    label: 'Description' },
   { key: 'ruleKind',       label: 'Monitor Type' },
+  { key: 'alertType',      label: 'Alert Type' },
   { key: 'disabled',       label: 'Status' },
   { key: 'monitorVersion', label: 'Last Modified' }
 ];
@@ -144,10 +147,19 @@ function sortBy(key) {
   renderTable(exportedRows);
 }
 
+function getAlertType(row) {
+  const es = row.postBody && row.postBody.effectiveScheduling;
+  if (!es) return '';
+  if ('transform' in es) return 'Transform';
+  if ('scheduled' in es) return 'Scheduled';
+  return '';
+}
+
 function getSortValue(row, key) {
   const m = row.list;
   if (key === 'monitorVersion') return m.monitorVersion ? Number(BigInt(String(m.monitorVersion)) / 1000000n) : 0;
   if (key === 'disabled') return m.disabled ? 1 : 0;
+  if (key === 'alertType') return getAlertType(row);
   return String(m[key] || '').toLowerCase();
 }
 
@@ -289,11 +301,19 @@ function renderTable(rows) {
       ? '<span class="badge badge-err">fetch failed</span>'
       : '<div class="post-btns"><button class="btn-copy-curl" onclick="copyCurl(' + origIdx + ', this)">Copy cURL</button><button class="btn-copy-ps" onclick="copyPS(' + origIdx + ', this)">Copy PowerShell</button></div>';
 
+    const alertType = getAlertType(row);
+    const alertTypeCell = alertType === 'Transform'
+      ? '<span class="badge badge-transform">Transform</span>'
+      : alertType === 'Scheduled'
+      ? '<span class="badge badge-scheduled">Scheduled</span>'
+      : '<span class="monitor-desc" style="color:#484f58">—</span>';
+
     html += '<tr>' +
       '<td><span class="monitor-name">' + escapeHtml(m.name || '') + '</span></td>' +
       '<td><span class="monitor-id">' + escapeHtml(m.id || '') + '</span></td>' +
       '<td><span class="monitor-desc">' + escapeHtml(m.description || '') + '</span></td>' +
       '<td><span class="badge ' + getTypeBadgeClass(m.ruleKind) + '">' + escapeHtml(m.ruleKind || '') + '</span></td>' +
+      '<td>' + alertTypeCell + '</td>' +
       '<td><span class="badge ' + (m.disabled ? 'badge-disabled' : 'badge-enabled') + '">' + (m.disabled ? 'Disabled' : 'Enabled') + '</span></td>' +
       '<td><span class="monitor-desc">' + escapeHtml(ts.display) + ' <span class="badge badge-tz">' + escapeHtml(ts.tz) + '</span></span></td>' +
       '<td>' + curlCell + '</td>' +
@@ -346,7 +366,7 @@ function copyPS(idx, btn) {
 function downloadCSV() {
   if (!exportedRows.length) return;
 
-  const headers = ['Name', 'Monitor ID', 'Description', 'Monitor Type', 'Status', 'Last Modified', 'POST Data (JSON)'];
+  const headers = ['Name', 'Monitor ID', 'Description', 'Monitor Type', 'Alert Type', 'Status', 'Last Modified', 'POST Data (JSON)'];
   const rows = [headers.map(csvCell).join(',')];
 
   exportedRows.forEach(function(row) {
@@ -358,6 +378,7 @@ function downloadCSV() {
       m.id || '',
       m.description || '',
       m.ruleKind || '',
+      getAlertType(row),
       m.disabled ? 'Disabled' : 'Enabled',
       ts.full,
       postData
