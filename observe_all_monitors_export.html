@@ -102,6 +102,10 @@
     <label>Bearer Token</label>
     <input type="password" id="token" placeholder="paste token here">
   </div>
+  <div class="form-group">
+    <label>Concurrency</label>
+    <input type="number" id="concurrency" value="10" min="1" max="25" style="width:64px;text-align:center;">
+  </div>
   <button class="btn btn-primary" id="exportBtn" onclick="startExport()">Export All Monitors</button>
 </div>
 
@@ -179,10 +183,11 @@ function setStatus(state, text) {
   el.innerHTML = (state === 'loading' ? '<span class="spinner"></span>' : '') + text;
 }
 
-function setProgress(done, total) {
+function setProgress(done, total, workers) {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   document.getElementById('progressFill').style.width = pct + '%';
-  document.getElementById('progressLabel').textContent = 'Fetching monitor details: ' + done + ' / ' + total + ' (' + pct + '%)';
+  const w = workers ? ' \u00b7 ' + workers + ' workers' : '';
+  document.getElementById('progressLabel').textContent = 'Fetching monitor details' + w + ': ' + done + ' / ' + total + ' (' + pct + '%)';
 }
 
 async function apiFetch(url, customerId, token) {
@@ -229,28 +234,32 @@ async function startExport() {
       return;
     }
 
+    const concurrency = Math.max(1, Math.min(25, parseInt(document.getElementById('concurrency').value) || 10));
     setStatus('loading', 'fetching details...');
-    setProgress(0, monitors.length);
+    setProgress(0, monitors.length, concurrency);
 
-    const errors = [];
-    for (let i = 0; i < monitors.length; i++) {
-      const m = monitors[i];
-      document.getElementById('progressLabel').textContent =
-        'Fetching "' + (m.name || m.id) + '" (' + (i + 1) + ' / ' + monitors.length + ')';
+    const results = new Array(monitors.length);
+    let nextIdx = 0;
+    let doneCount = 0;
 
-      let detail = null;
-      try {
-        detail = await apiFetch('https://' + host + '/v1/monitors/' + m.id, customerId, token);
-      } catch (e) {
-        errors.push({ id: m.id, name: m.name, err: e });
+    async function fetchWorker() {
+      while (nextIdx < monitors.length) {
+        const i = nextIdx++;
+        const m = monitors[i];
+        let detail = null;
+        try {
+          detail = await apiFetch('https://' + host + '/v1/monitors/' + m.id, customerId, token);
+        } catch (e) { /* recorded via null detail */ }
+        results[i] = { list: m, postBody: detail ? transformForCreate(detail) : null, error: !detail };
+        doneCount++;
+        setProgress(doneCount, monitors.length, concurrency);
       }
-
-      const postBody = detail ? transformForCreate(detail) : null;
-      exportedRows.push({ list: m, postBody, error: !detail });
-      setProgress(i + 1, monitors.length);
     }
 
-    const errCount = errors.length;
+    await Promise.all(Array.from({ length: Math.min(concurrency, monitors.length) }, fetchWorker));
+    exportedRows = results;
+
+    const errCount = results.filter(function(r) { return r.error; }).length;
     if (errCount > 0) {
       setStatus('warn', (monitors.length - errCount) + ' ok, ' + errCount + ' failed');
     } else {
